@@ -3,9 +3,9 @@
 //! This module provides the `run_vm` async function to launch and manage a KVM-based VM instance
 //! with the configuration provided by `VmSetup`.
 
-use kvm_ioctls::{Kvm, VcpuExit, Vcpu};
+use kvm_ioctls::{Kvm, VcpuExit, VcpuFd};
 use crate::vm_setup::setup_utils::VmSetup;
-use vm_memory::{GuestAddress, GuestMemoryMmap};
+use vm_memory::{GuestAddress, GuestMemoryMmap, GuestMemory};
 use kvm_bindings;
 
 /// Asynchronously runs a virtual machine using KVM with the provided setup.
@@ -41,7 +41,7 @@ pub async fn run_vm(setup: VmSetup) -> Result<(), String> {
     };
 
     // Register the memory region with the VM
-    if let Err(e) = vm.set_memory_region(kvm_bindings::kvm_userspace_memory_region {
+    if let Err(e) = vm.set_user_memory_region(kvm_bindings::kvm_userspace_memory_region {
         slot: 0,
         guest_phys_addr: 0x4000,
         memory_size: setup.get_memory_size() as u64,
@@ -56,7 +56,7 @@ pub async fn run_vm(setup: VmSetup) -> Result<(), String> {
         Vec::with_capacity(setup.get_cpu_cores_count() as usize);
     for cpu_id in 0..setup.get_cpu_cores_count() {
         // Create a VCPU for this core
-        let vcpu = match vm.create_vcpu(cpu_id) {
+        let vcpu = match vm.create_vcpu(cpu_id as u64) {
             Ok(vcpu) => vcpu,
             Err(e) => return Err(format!("Failed to create VCPU {}: {}", cpu_id, e)),
         };
