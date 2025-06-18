@@ -84,16 +84,16 @@ pub async fn run_vm(setup: VmSetup) -> Result<(), String> {
                             VcpuExit::Hlt => { 
                                 return Ok(format!("VCPU {} exited with HLT instruction", cpu_id));
                              },
-                            VcpuExit::IoIn { port, data } => { 
+                            VcpuExit::IoIn( port, data ) => { 
                                 return Err(format!("VCPU {} encountered IO in at port {:x} with data {:?}", cpu_id, port, data));
                              },
-                            VcpuExit::IoOut { port, data } => { 
+                            VcpuExit::IoOut( port, data) => { 
                                 return Err(format!("VCPU {} encountered IO out at port {:x} with data {:?}", cpu_id, port, data));
                              },
-                            VcpuExit::MmioRead { address, data } => { 
+                            VcpuExit::MmioRead ( address, data ) => { 
                                 return Err(format!("VCPU {} encountered MMIO read at address {:x}", cpu_id, address));
                              },
-                            VcpuExit::MmioWrite { address, data } => { 
+                            VcpuExit::MmioWrite ( address, data ) => { 
                                 return Err(format!("VCPU {} encountered MMIO write at address {:x}", cpu_id, address));
                              },
                             VcpuExit::Shutdown => { 
@@ -102,7 +102,7 @@ pub async fn run_vm(setup: VmSetup) -> Result<(), String> {
                             VcpuExit::InternalError => { 
                                 return Err(format!("VCPU {} encountered an internal error", cpu_id));
                              },
-                            VcpuExit::SystemEvent { .. } => { 
+                            VcpuExit::SystemEvent (..) => { 
                                 return Err(format!("VCPU {} encountered a system event", cpu_id));
                              },
                             _ => { 
