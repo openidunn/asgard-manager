@@ -5,7 +5,7 @@
 
 use kvm_ioctls::{Kvm, VcpuExit};
 use crate::vm_setup::setup_utils::VmSetup;
-use vm_memory::{GuestAddress, GuestMemoryMmap, GuestMemory};
+use vm_memory::{GuestAddress, GuestMemoryMmap};
 use kvm_bindings;
 
 /// Asynchronously runs a virtual machine using KVM with the provided setup.
