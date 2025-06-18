@@ -41,22 +41,24 @@ pub async fn run_vm(setup: VmSetup) -> Result<(), String> {
     };
 
     // Register the memory region with the VM
-    if let Err(e) = vm.set_user_memory_region(kvm_bindings::kvm_userspace_memory_region {
+    if let Err(e) = unsafe {
+        vm.set_user_memory_region(kvm_bindings::kvm_userspace_memory_region {
         slot: 0,
         guest_phys_addr: 0x4000,
         memory_size: setup.get_memory_size() as u64,
         userspace_addr: host_addr as u64,
         flags: 0,
-    }) {
+        })
+    } {
         return Err(format!("Failed to set memory region: {}", e));
     };
 
     // Spawn a blocking task for each virtual CPU core
-    let handlers: Vec<tokio::task::JoinHandle<Result<String, String>>> =
+    let mut handlers: Vec<tokio::task::JoinHandle<Result<String, String>>> =
         Vec::with_capacity(setup.get_cpu_cores_count() as usize);
     for cpu_id in 0..setup.get_cpu_cores_count() {
         // Create a VCPU for this core
-        let vcpu = match vm.create_vcpu(cpu_id as u64) {
+        let mut vcpu = match vm.create_vcpu(cpu_id as u64) {
             Ok(vcpu) => vcpu,
             Err(e) => return Err(format!("Failed to create VCPU {}: {}", cpu_id, e)),
         };
@@ -90,10 +92,10 @@ pub async fn run_vm(setup: VmSetup) -> Result<(), String> {
                             VcpuExit::IoOut( port, data) => { 
                                 return Err(format!("VCPU {} encountered IO out at port {:x} with data {:?}", cpu_id, port, data));
                              },
-                            VcpuExit::MmioRead ( address, data ) => { 
+                            VcpuExit::MmioRead ( address, _data ) => { 
                                 return Err(format!("VCPU {} encountered MMIO read at address {:x}", cpu_id, address));
                              },
-                            VcpuExit::MmioWrite ( address, data ) => { 
+                            VcpuExit::MmioWrite ( address, _data ) => { 
                                 return Err(format!("VCPU {} encountered MMIO write at address {:x}", cpu_id, address));
                              },
                             VcpuExit::Shutdown => { 
