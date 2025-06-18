@@ -3,7 +3,7 @@
 //! This module provides the `run_vm` async function to launch and manage a KVM-based VM instance
 //! with the configuration provided by `VmSetup`.
 
-use kvm_ioctls::{Kvm, VcpuExit, VcpuFd};
+use kvm_ioctls::{Kvm, VcpuExit};
 use crate::vm_setup::setup_utils::VmSetup;
 use vm_memory::{GuestAddress, GuestMemoryMmap, GuestMemory};
 use kvm_bindings;
@@ -45,7 +45,7 @@ pub async fn run_vm(setup: VmSetup) -> Result<(), String> {
         slot: 0,
         guest_phys_addr: 0x4000,
         memory_size: setup.get_memory_size() as u64,
-        userspace_addr: host_addr,
+        userspace_addr: host_addr as u64,
         flags: 0,
     }) {
         return Err(format!("Failed to set memory region: {}", e));
