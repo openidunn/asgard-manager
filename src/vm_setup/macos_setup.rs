@@ -2,44 +2,12 @@
 //!
 //! This module provides the `VmSetup` struct for configuring VM memory and CPU cores,
 //! and the `run_vm` async function to launch and manage a VM instance.
-
 use applevisor::*;
 use std::{result::Result};
 use tokio;
 use tokio::sync::Mutex;
 use std::sync::Arc;
-
-/// Configuration for a Virtual Machine instance.
-pub struct VmSetup {
-    /// Size of VM memory in bytes.
-    memory: usize,
-    /// Number of CPU cores to allocate to the VM.
-    cpu_cores_count: u32
-}
-
-impl VmSetup {
-    /// Create a new `VmSetup`.
-    ///
-    /// # Arguments
-    /// * `mega_bytes` - Memory size in megabytes.
-    /// * `cpu_cores_count` - Number of CPU cores (defaults to 2 if 0).
-    pub fn new(mega_bytes: u32, cpu_cores_count: u32) -> VmSetup {
-        let cpu_cores_to_set = if cpu_cores_count == 0 || cpu_cores_count == 1 {
-            2
-        } else {
-            cpu_cores_count
-        };
-        VmSetup {memory: 1024 * 1024 * mega_bytes as usize, cpu_cores_count: cpu_cores_to_set}
-    }
-    /// Get the configured memory size in bytes.
-    pub fn get_memory_size(&self) -> usize {
-        self.memory
-    }
-    /// Get the configured number of CPU cores.
-    pub fn get_cpu_cores_count(&self) -> u32 {
-        self.cpu_cores_count
-    }
-}
+use crate::vm_setup::setup_utils::VmSetup;
 
 /// Asynchronously run a Virtual Machine with the given setup on macOS.
 ///
@@ -50,7 +18,6 @@ impl VmSetup {
 /// * `Ok(())` if the VM runs successfully.
 /// * `Err(String)` if any error occurs during setup or execution.
 //Running VM on macos
-#[cfg(target_os = "macos")]
 pub async fn run_vm(setup: VmSetup) -> Result<(), String> {
 
     // Create a new VirtualMachine instance, wrapped in Arc<Mutex<...>> for thread safety.
@@ -70,7 +37,7 @@ pub async fn run_vm(setup: VmSetup) -> Result<(), String> {
 
     // Spawn a blocking task for each virtual CPU core.
     let mut handlers: Vec<tokio::task::JoinHandle<Result<String, String>>> = Vec::new();
-    for i in 0..setup.cpu_cores_count {
+    for i in 0..setup.get_cpu_cores_count() {
         
         let handle = tokio::task::spawn_blocking(move || {
             // Create a new VCPU instance.

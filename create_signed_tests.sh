@@ -1,8 +1,9 @@
 #!/bin/bash
 
 echo "Cleaning and building tests..."
+sudo chown -R $(whoami) ./target
 cargo clean
-cargo test --no-run
+cargo test --features apple_darwin --no-run
 
 echo "Finding and signing test binaries..."
 find target/debug/deps -type f -perm +111 | while read binary; do
@@ -19,4 +20,4 @@ find target/debug/deps -type f -perm +111 | while read binary; do
 done
 
 echo "Running tests..."
-sudo cargo test
+sudo cargo test --features apple_darwin
