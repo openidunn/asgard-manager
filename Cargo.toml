@@ -11,7 +11,7 @@ kvm-bindings = { version = "0.7", optional = true }  # Linux KVM kernel bindings
 
 # Common dependencies
 tokio = { version = "1.45.0", features = ["full"] }
-vm-memory = "0.13"
+vm-memory = { version = "0.13.0", features = ["backend-mmap"] }
 
 [features]
 default = []

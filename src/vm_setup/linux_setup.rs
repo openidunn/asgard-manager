@@ -3,7 +3,7 @@
 //! This module provides the `run_vm` async function to launch and manage a KVM-based VM instance
 //! with the configuration provided by `VmSetup`.
 
-use kvm_ioctools::{Kvm, VcpuExit, Vcpu};
+use kvm_ioctls::{Kvm, VcpuExit, Vcpu};
 use crate::vm_setup::setup_utils::VmSetup;
 use vm_memory::{GuestAddress, GuestMemoryMmap};
 use kvm_bindings;
