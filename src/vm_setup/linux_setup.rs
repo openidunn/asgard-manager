@@ -5,7 +5,7 @@
 
 use kvm_ioctls::{Kvm, VcpuExit};
 use crate::vm_setup::setup_utils::VmSetup;
-use vm_memory::{GuestAddress, GuestMemoryMmap};
+use vm_memory::{GuestAddress, GuestMemoryMmap, GuestMemory};
 use kvm_bindings;
 
 /// Asynchronously runs a virtual machine using KVM with the provided setup.
@@ -30,7 +30,7 @@ pub async fn run_vm(setup: VmSetup) -> Result<(), String> {
 
     // Set up guest memory at a specific address
     let load_addr = GuestAddress(0x4000);
-    let guest_memory = match GuestMemoryMmap::from_ranges(&[(load_addr, setup.get_memory_size())]) {
+    let guest_memory: GuestMemoryMmap = match GuestMemoryMmap::from_ranges(&[(load_addr, setup.get_memory_size())]) {
         Ok(mem) => mem,
         Err(e) => return Err(format!("Failed to create guest memory: {}", e)),
     };
