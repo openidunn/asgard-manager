@@ -29,7 +29,8 @@ pub async fn run_vm(setup: VmSetup) -> Result<(), String> {
     };
 
     // Set up guest memory at a specific address
-    let load_addr = GuestAddress(0x4000);
+    let guest_phys_addr = 0x100000;
+    let load_addr = GuestAddress(guest_phys_addr);
     let guest_memory: GuestMemoryMmap = match GuestMemoryMmap::from_ranges(&[(load_addr, setup.get_memory_size())]) {
         Ok(mem) => mem,
         Err(e) => return Err(format!("Failed to create guest memory: {}", e)),
@@ -44,7 +45,7 @@ pub async fn run_vm(setup: VmSetup) -> Result<(), String> {
     if let Err(e) = unsafe {
         vm.set_user_memory_region(kvm_bindings::kvm_userspace_memory_region {
         slot: 0,
-        guest_phys_addr: 0x4000,
+        guest_phys_addr: guest_phys_addr,
         memory_size: setup.get_memory_size() as u64,
         userspace_addr: host_addr as u64,
         flags: 0,
@@ -69,7 +70,7 @@ pub async fn run_vm(setup: VmSetup) -> Result<(), String> {
             Err(e) => return Err(format!("Failed to get VCPU {} registers: {}", cpu_id, e)),
         };
 
-        regs.rip = 0x1000;
+        regs.rip = guest_phys_addr; // Set instruction pointer to the start address
         regs.rflags = 0x2;
 
         if let Err(e) = vcpu.set_regs(&regs) {
