@@ -7,6 +7,14 @@ pub fn create_partition() -> Result<WHV_PARTITION_HANDLE, String> {
     }
 }
 
+pub fn delete_partition(handle: WHV_PARTITION_HANDLE) -> Result<(), String> {
+    if let Err(e) = unsafe { WHvDeletePartition(handle) } {
+        return Err(format!("{:?}", e))
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 #[cfg(target_os = "windows")]
 mod tests {
@@ -28,5 +36,20 @@ mod tests {
         }
 
         assert!(true)
+    }
+
+    #[test]
+    fn test_delete_partition() {
+        let raw_handle = unsafe { WHvCreatePartition() };
+        match raw_handle {
+            Ok(handle) => {
+                let del_result = delete_partition(handle);
+                assert!(del_result.is_ok(), "Partition deletion failed: {:?}", del_result.err());
+            }
+            Err(e) => {
+                println!("Raw WHvCreatePartition failed: {:?}", e);
+                assert!(false, "Raw partition creation failed");
+            }
+        }
     }
 }
