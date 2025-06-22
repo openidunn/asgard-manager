@@ -3,6 +3,8 @@ use windows::Win32::System::Hypervisor::{WHvCreatePartition, WHvDeletePartition,
     WHvMapGpaRangeFlagWrite, WHvMapGpaRangeFlagExecute, WHvSetupPartition
 };
 use windows::Win32::System::SystemInformation::{GlobalMemoryStatusEx, MEMORYSTATUSEX};
+use windows::core::HRESULT;
+use windows::Win32::System::Memory::{VirtualAlloc, MEM_COMMIT, MEM_RESERVE, PAGE_READWRITE};
 
 fn get_physical_memory_info() -> Result<(u64, u64), String> {
     unsafe {
@@ -55,10 +57,51 @@ pub fn setup_partition(partition: WHV_PARTITION_HANDLE) -> Result<(), String> {
     }
 }
 
+pub fn allocate_partition_memory(partition: WHV_PARTITION_HANDLE, mem_size: u64) -> Result<(), String> {
+    let (total_mem, avail_mem) = match get_physical_memory_info() {
+        Ok((total_mem, avail_mem)) => (total_mem, avail_mem),
+        Err(e) => return Err(format!("Failed to get memory info: {}", e)),
+    };
+
+    if avail_mem < mem_size {
+        return Err("Failed to allocate the memory: not enough available memory".to_string());
+    }
+
+    // Allocate host memory
+    let ptr = unsafe {
+        VirtualAlloc(
+            None,
+            mem_size as usize,
+            MEM_COMMIT | MEM_RESERVE,
+            PAGE_READWRITE,
+        )
+    };
+    if ptr.is_null() {
+        return Err("VirtualAlloc failed".to_string());
+    }
+
+    // Map into guest physical address space
+    let flags = WHV_MAP_GPA_RANGE_FLAGS(
+        WHvMapGpaRangeFlagRead.0 |
+        WHvMapGpaRangeFlagWrite.0 |
+        WHvMapGpaRangeFlagExecute.0,
+    );
+
+    let result = unsafe {
+        WHvMapGpaRange(partition, ptr as *mut _, 0x0000, mem_size, flags)
+    };
+
+    match result {
+        Ok(()) => Ok(()),
+        Err(e) => Err(format!("Failed to map memory: {:?}", e)),
+    }
+}
+
 #[cfg(test)]
 #[cfg(target_os = "windows")]
 mod tests {
     use super::*;
+    use std::mem::size_of;
 
     #[test]
     fn test_get_physical_memory_info_success() {
@@ -216,5 +259,53 @@ mod tests {
             "Expected HRESULT error, got: {}",
             err_msg
         );
+    }
+
+    #[test]
+    fn test_allocate_partition_memory_success() {
+        let partition: WHV_PARTITION_HANDLE = unsafe { WHvCreatePartition() }.expect("Failed to create partition");
+
+        let cpu_count: u32 = 1;
+        unsafe {
+            WHvSetPartitionProperty(
+                partition,
+                WHvPartitionPropertyCodeProcessorCount,
+                &cpu_count as *const _ as *const _,
+                size_of::<u32>() as u32,
+            ).expect("Failed to set processor count");
+
+            WHvSetupPartition(partition).expect("Failed to setup partition");
+        }
+
+        let result = allocate_partition_memory(partition, 4096);
+        assert!(result.is_ok(), "Expected success, got error: {:?}", result.err());
+
+        unsafe { WHvDeletePartition(partition) };
+    }
+
+    #[test]
+    fn test_allocate_partition_memory_insufficient_memory() {
+        let partition: WHV_PARTITION_HANDLE = unsafe { WHvCreatePartition() }.expect("Failed to create partition");
+
+        let cpu_count: u32 = 1;
+        unsafe {
+            WHvSetPartitionProperty(
+                partition,
+                WHvPartitionPropertyCodeProcessorCount,
+                &cpu_count as *const _ as *const _,
+                size_of::<u32>() as u32,
+            ).expect("Failed to set processor count");
+
+            WHvSetupPartition(partition).expect("Failed to setup partition");
+        }
+
+        let result = allocate_partition_memory(partition, u64::MAX);
+        assert!(result.is_err());
+        assert!(
+            result.as_ref().unwrap_err().contains("not enough available memory"),
+            "Unexpected error: {:?}", result
+        );
+
+        unsafe { WHvDeletePartition(partition) };
     }
 }
