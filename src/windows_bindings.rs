@@ -1,6 +1,7 @@
 use windows::Win32::System::Hypervisor::{WHvCreatePartition, WHvDeletePartition, WHvSetPartitionProperty,
     WHV_PARTITION_HANDLE, WHvPartitionPropertyCodeProcessorCount, WHvMapGpaRange, WHV_MAP_GPA_RANGE_FLAGS, WHvMapGpaRangeFlagRead, 
-    WHvMapGpaRangeFlagWrite, WHvMapGpaRangeFlagExecute, WHvSetupPartition, WHvCreateVirtualProcessor
+    WHvMapGpaRangeFlagWrite, WHvMapGpaRangeFlagExecute, WHvSetupPartition, WHvCreateVirtualProcessor, WHvRunVirtualProcessor, 
+    WHV_RUN_VP_EXIT_CONTEXT
 };
 use windows::Win32::System::SystemInformation::{GlobalMemoryStatusEx, MEMORYSTATUSEX};
 use windows::core::HRESULT;
@@ -101,6 +102,15 @@ pub fn create_vcpu(partition: WHV_PARTITION_HANDLE, cpu_id: u32) -> Result<(), S
     let hresult = unsafe { WHvCreateVirtualProcessor(partition, cpu_id, 0) };
     if let Err(e) = hresult {
         return Err(format!("Failed to create virtual processor: {:?}", e));
+    }
+
+    Ok(())
+}
+
+pub fn run_vcpu(partition: WHV_PARTITION_HANDLE, cpu_id: u32, vcpu_ctx: &mut WHV_RUN_VP_EXIT_CONTEXT) -> Result<(), String> {
+    let val_size = std::mem::size_of_val(vcpu_ctx) as u32;
+    if let Err(e) = unsafe { WHvRunVirtualProcessor(partition, cpu_id, vcpu_ctx as *mut _ as *mut _, val_size) } {
+        return Err(format!("{:?}", e));
     }
 
     Ok(())
@@ -354,5 +364,97 @@ mod tests {
                 "Expected error when creating vCPU with invalid partition"
             );
         }
+    }
+
+    #[test]
+    fn test_run_vcpu_success() {
+
+        let partition = unsafe {
+                WHvCreatePartition()
+        }.expect("WHvCreatePartition failed");
+
+        let processor_count: u32 = 1;
+        let set_result = unsafe {
+                WHvSetPartitionProperty(
+                        partition,
+                        WHvPartitionPropertyCodeProcessorCount,
+                        &processor_count as *const _ as *const _,
+                        size_of::<u32>() as u32,
+                )
+        };
+        assert!(
+                set_result.is_ok(),
+                "WHvSetPartitionProperty failed: {:?}",
+                set_result.err()
+        );
+
+        let setup_result = unsafe {
+                WHvSetupPartition(partition)
+        };
+        assert!(
+                setup_result.is_ok(),
+                "WHvSetupPartition failed: {:?}",
+                setup_result.err()
+        );
+
+        let mem_size: usize = 4096;
+        let mem_ptr = unsafe {
+                VirtualAlloc(
+                        None,
+                        mem_size,
+                        MEM_COMMIT | MEM_RESERVE,
+                        PAGE_READWRITE,
+                )
+        };
+        assert!(
+                !mem_ptr.is_null(),
+                "VirtualAlloc failed"
+        );
+
+        let map_flags = WHV_MAP_GPA_RANGE_FLAGS(
+                  WHvMapGpaRangeFlagRead.0
+                | WHvMapGpaRangeFlagWrite.0
+                | WHvMapGpaRangeFlagExecute.0,
+        );
+        let map_result = unsafe {
+                WHvMapGpaRange(
+                        partition,
+                        mem_ptr as *mut _,
+                        0x0000,
+                        mem_size as u64,
+                        map_flags,
+                )
+        };
+        assert!(
+                map_result.is_ok(),
+                "WHvMapGpaRange failed: {:?}",
+                map_result.err()
+        );
+
+        let create_result = unsafe {
+                WHvCreateVirtualProcessor(partition, 0, 0)
+        };
+        assert!(
+                create_result.is_ok(),
+                "WHvCreateVirtualProcessor failed: {:?}",
+                create_result.err()
+        );
+
+        let mut ctx = WHV_RUN_VP_EXIT_CONTEXT::default();
+        let result = run_vcpu(partition, 0, &mut ctx);
+        assert!(
+                result.is_ok(),
+                "run_vcpu failed: {:?}",
+                result.err()
+        );
+
+        let delete_result = unsafe {
+                WHvDeletePartition(partition)
+        };
+        assert!(
+                delete_result.is_ok(),
+                "WHvDeletePartition failed: {:?}",
+                delete_result.err()
+        );
     }
 }
