@@ -1,6 +1,6 @@
 use windows::Win32::System::Hypervisor::{WHvCreatePartition, WHvDeletePartition, WHvSetPartitionProperty,
     WHV_PARTITION_HANDLE, WHvPartitionPropertyCodeProcessorCount, WHvMapGpaRange, WHV_MAP_GPA_RANGE_FLAGS, WHvMapGpaRangeFlagRead, 
-    WHvMapGpaRangeFlagWrite, WHvMapGpaRangeFlagExecute, WHvSetupPartition
+    WHvMapGpaRangeFlagWrite, WHvMapGpaRangeFlagExecute, WHvSetupPartition, WHvCreateVirtualProcessor
 };
 use windows::Win32::System::SystemInformation::{GlobalMemoryStatusEx, MEMORYSTATUSEX};
 use windows::core::HRESULT;
@@ -95,6 +95,15 @@ pub fn allocate_partition_memory(partition: WHV_PARTITION_HANDLE, mem_size: u64)
         Ok(()) => Ok(()),
         Err(e) => Err(format!("Failed to map memory: {:?}", e)),
     }
+}
+
+pub fn create_vcpu(partition: WHV_PARTITION_HANDLE, cpu_id: u32) -> Result<(), String> {
+    let hresult = unsafe { WHvCreateVirtualProcessor(partition, cpu_id, 0) };
+    if let Err(e) = hresult {
+        return Err(format!("Failed to create virtual processor: {:?}", e));
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -307,5 +316,43 @@ mod tests {
         );
 
         unsafe { WHvDeletePartition(partition) };
+    }
+
+    #[test]
+    fn test_create_vcpu_success() {
+        unsafe {
+            let partition = WHvCreatePartition().expect("Failed to create partition");
+
+            let processor_count: u32 = 1;
+            let result = WHvSetPartitionProperty(
+                partition,
+                WHvPartitionPropertyCodeProcessorCount,
+                &processor_count as *const _ as *const _,
+                std::mem::size_of::<u32>() as u32,
+            );
+            assert!(result.is_ok(), "Failed to set processor count: {:?}", result);
+
+            let setup_result = WHvSetupPartition(partition);
+            assert!(setup_result.is_ok(), "Failed to set up partition: {:?}", setup_result);
+
+            let result = create_vcpu(partition, 0);
+            assert!(result.is_ok(), "create_vcpu failed: {:?}", result);
+
+            let _ = WHvDeletePartition(partition);
+        }
+    }
+
+    #[test]
+    fn test_create_vcpu_invalid_partition() {
+        unsafe {
+            // Intentionally pass an invalid/null handle
+            let fake_partition: WHV_PARTITION_HANDLE = WHV_PARTITION_HANDLE::default();
+            let result = create_vcpu(fake_partition, 0);
+
+            assert!(
+                result.is_err(),
+                "Expected error when creating vCPU with invalid partition"
+            );
+        }
     }
 }
