@@ -107,13 +107,14 @@ pub fn create_vcpu(partition: WHV_PARTITION_HANDLE, cpu_id: u32) -> Result<(), S
     Ok(())
 }
 
-pub fn run_vcpu(partition: WHV_PARTITION_HANDLE, cpu_id: u32, vcpu_ctx: &mut WHV_RUN_VP_EXIT_CONTEXT) -> Result<(), String> {
-    let val_size = std::mem::size_of_val(vcpu_ctx) as u32;
-    if let Err(e) = unsafe { WHvRunVirtualProcessor(partition, cpu_id, vcpu_ctx as *mut _ as *mut _, val_size) } {
+pub fn run_vcpu(partition: WHV_PARTITION_HANDLE, cpu_id: u32) -> Result<WHV_RUN_VP_EXIT_CONTEXT, String> {
+    let mut vcpu_ctx: WHV_RUN_VP_EXIT_CONTEXT = WHV_RUN_VP_EXIT_CONTEXT::default();
+    let val_size = std::mem::size_of_val(&vcpu_ctx) as u32;
+    if let Err(e) = unsafe { WHvRunVirtualProcessor(partition, cpu_id, &mut vcpu_ctx as *mut _ as *mut _, val_size) } {
         return Err(format!("{:?}", e));
     }
 
-    Ok(())
+    Ok(vcpu_ctx)
 }
 
 #[cfg(test)]
@@ -440,8 +441,7 @@ mod tests {
                 create_result.err()
         );
 
-        let mut ctx = WHV_RUN_VP_EXIT_CONTEXT::default();
-        let result = run_vcpu(partition, 0, &mut ctx);
+        let result = run_vcpu(partition, 0);
         assert!(
                 result.is_ok(),
                 "run_vcpu failed: {:?}",
