@@ -32,24 +32,24 @@ use tokio::task;
 ///
 pub async fn run_vm(setup: VmSetup) -> Result<(), String> {
     // 1. Create a new partition (virtual machine container)
-    let partition: WHV_PARTITION_HANDLE = match create_partition() {
+    let partition: Partition = match create_partition() {
         Ok(p) => p,
         Err(e) => return Err(format!("Partition creation failed: {:?}", e)),
     };
 
     // 2. Set the number of virtual processors for the partition
     let processor_count = setup.get_cpu_cores_count() as u32;
-    if let Err(e) = set_processor_count_property(partition, setup.get_cpu_cores_count()) {
+    if let Err(e) = set_processor_count_property(partition.get_whv_partition_handle(), setup.get_cpu_cores_count()) {
         return Err(format!("Failed to set processor count: {:?}", e));
     }
 
     // 3. Setup the partition (apply all configured properties)
-    if let Err(e) = setup_partition(partition) {
+    if let Err(e) = setup_partition(partition.get_whv_partition_handle()) {
         return Err(format!("Failed to setup partition: {:?}", e));
     }
 
     // 4. Allocate and map guest physical memory for the partition
-    if let Err(e) = allocate_partition_memory(partition, setup.get_memory_size() as u64) {
+    if let Err(e) = allocate_partition_memory(partition.get_whv_partition_handle(), setup.get_memory_size() as u64) {
         return Err(format!("Failed to allocate and map guest memory: {:?}", e));
     }
 
@@ -57,7 +57,7 @@ pub async fn run_vm(setup: VmSetup) -> Result<(), String> {
     let mut handlers: Vec<tokio::task::JoinHandle<Result<String, String>>> = Vec::new();
     for cpu_id in 0..setup.get_cpu_cores_count() {
         // Clone the partition handle for each task (handle is Copy)
-        let ph = partition.clone();
+        let ph = partition.get_whv_partition_handle().clone();
 
         // Spawn a blocking task for each vCPU to avoid blocking async runtime
         handlers.push(task::spawn_blocking(move || -> Result<String, String> {
@@ -119,9 +119,6 @@ pub async fn run_vm(setup: VmSetup) -> Result<(), String> {
             Err(e) => return Err(format!("Task join error: {}", e)), // Tokio task join error
         }
     }
-
-    // Clean up: delete the partition after all vCPUs have finished
-    let _ = delete_partition(partition);
 
     Ok(())
 }

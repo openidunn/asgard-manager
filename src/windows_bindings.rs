@@ -64,11 +64,11 @@ fn get_physical_memory_info() -> Result<(u64, u64), String> {
     }
 }
 
-/// Creates a new Hyper-V partition and returns its handle.
+/// Creates a new Hyper-V partition and returns Partition instance with its handle.
 /// On failure, returns an error string.
-pub fn create_partition() -> Result<WHV_PARTITION_HANDLE, String> {
+pub fn create_partition() -> Result<Partition, String> {
     match unsafe { WHvCreatePartition() } {
-        Ok(handle) => Ok(handle),
+        Ok(handle) => Ok(Partition::new(handle)),
         Err(e) => Err(format!("{:?}", e))
     }
 }
@@ -247,9 +247,7 @@ mod tests {
         let result = create_partition();
         match result {
             Ok(handle) => {
-                println!("Partition created: {:?}", handle);
-                // Clean up after test
-                let _ = unsafe { WHvDeletePartition(handle) };
+                println!("Partition created: {:?}", handle.get_whv_partition_handle());
             }
             Err(e) => {
                 println!("Partition creation failed: {}", e);
