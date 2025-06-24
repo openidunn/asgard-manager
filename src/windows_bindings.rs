@@ -176,12 +176,12 @@ pub fn create_vcpu(partition: &Partition, cpu_id: u32) -> Result<(), String> {
 
 /// Runs the virtual CPU with the given CPU ID on the specified partition.
 /// Returns the exit context on success or error string on failure.
-pub fn run_vcpu(partition: WHV_PARTITION_HANDLE, cpu_id: u32) -> Result<WHV_RUN_VP_EXIT_CONTEXT, String> {
+pub fn run_vcpu(partition: &Partition, cpu_id: u32) -> Result<WHV_RUN_VP_EXIT_CONTEXT, String> {
     let mut vcpu_ctx: WHV_RUN_VP_EXIT_CONTEXT = WHV_RUN_VP_EXIT_CONTEXT::default();
     let val_size = std::mem::size_of_val(&vcpu_ctx) as u32;
 
     // Run the vCPU and fill vcpu_ctx with exit information
-    if let Err(e) = unsafe { WHvRunVirtualProcessor(partition, cpu_id, &mut vcpu_ctx as *mut _ as *mut _, val_size) } {
+    if let Err(e) = unsafe { WHvRunVirtualProcessor(partition.get_whv_partition_handle(), cpu_id, &mut vcpu_ctx as *mut _ as *mut _, val_size) } {
         return Err(format!("{:?}", e));
     }
 
@@ -492,7 +492,7 @@ mod tests {
         assert!(create_vcpu_result.is_ok(), "create_vcpu failed: {:?}", create_vcpu_result.err());
 
         // Run the virtual processor
-        let run_result = run_vcpu(partition.get_whv_partition_handle(), 0);
+        let run_result = run_vcpu(&partition, 0);
         assert!(
             run_result.is_ok(),
             "WHvRunVirtualProcessor failed: {:?}",
@@ -504,8 +504,8 @@ mod tests {
     #[test]
     fn test_run_vcpu_invalid_partition() {
         let invalid_partition = WHV_PARTITION_HANDLE::default();
-
-        let result = run_vcpu(invalid_partition, 0);
+        let partition = Partition::new(invalid_partition);
+        let result = run_vcpu(&partition, 0);
         assert!(result.is_err(), "Expected failure on invalid partition handle");
     }
 }

@@ -70,7 +70,7 @@ pub async fn run_vm(setup: VmSetup) -> Result<(), String> {
             // Enter an execution loop for this vCPU
             loop {
                 // Run the vCPU until it exits for some reason
-                let exit_ctx = match run_vcpu(ph.get_whv_partition_handle(), cpu_id) {
+                let exit_ctx = match run_vcpu(&ph, cpu_id) {
                     Ok(exit_ctx) => exit_ctx,
                     Err(e) => return Err(format!("VCPU {} failed to run: {:?}", cpu_id, e))
                 };
