@@ -109,8 +109,8 @@ fn delete_partition(partition: WHV_PARTITION_HANDLE) -> Result<(), String> {
 /// Finalizes the partition setup after properties are configured.
 /// Must be called before running virtual processors.
 /// Returns Ok on success or an error string on failure.
-pub fn setup_partition(partition: WHV_PARTITION_HANDLE) -> Result<(), String> {
-    match unsafe { WHvSetupPartition(partition) } {
+pub fn setup_partition(partition: &Partition) -> Result<(), String> {
+    match unsafe { WHvSetupPartition(partition.get_whv_partition_handle()) } {
         Ok(()) => Ok(()),
         Err(e) => Err(format!("{:?}", e))
     }
@@ -316,13 +316,13 @@ mod tests {
     /// Test setting processor count property and successful partition setup
     #[test]
     fn test_setup_partition_success() {
-        let partition = unsafe { WHvCreatePartition() }.expect("Failed to create partition");
+        let partition = create_partition().expect("Failed to create partition");
 
         // Set required processor count before setup
         let processor_count: u32 = 2;
         let set_result = unsafe {
             WHvSetPartitionProperty(
-                partition,
+                partition.get_whv_partition_handle(),
                 WHvPartitionPropertyCodeProcessorCount,
                 &processor_count as *const _ as *const _,
                 std::mem::size_of::<u32>() as u32,
@@ -331,19 +331,17 @@ mod tests {
         assert!(set_result.is_ok(), "Failed to set processor count: {:?}", set_result.err());
 
         // Now call setup
-        let result = setup_partition(partition);
+        let result = setup_partition(&partition);
         assert!(result.is_ok(), "setup_partition failed: {:?}", result.err());
-
-        let _ = unsafe { WHvDeletePartition(partition) };
     }
 
     /// Test setup fails if required processor count property is not set
     #[test]
     fn test_setup_partition_without_processor_property() {
-        let partition = unsafe { WHvCreatePartition() }.expect("Failed to create partition");
+        let partition = create_partition().expect("Failed to create partition");
 
         // Intentionally skip setting processor count
-        let result = setup_partition(partition);
+        let result = setup_partition(&partition);
         assert!(result.is_err(), "Expected setup to fail without required properties");
 
         let err_msg = result.unwrap_err();
@@ -352,16 +350,14 @@ mod tests {
             "Expected HRESULT error, got: {}",
             err_msg
         );
-
-        let _ = unsafe { WHvDeletePartition(partition) };
     }
 
     /// Test setup fails with invalid partition handle
     #[test]
     fn test_setup_partition_with_invalid_handle() {
         let invalid_partition = WHV_PARTITION_HANDLE::default(); // NULL / invalid handle
-
-        let result = setup_partition(invalid_partition);
+        let partition = Partition::new(invalid_partition);
+        let result = setup_partition(&partition);
         assert!(result.is_err(), "Expected setup to fail with invalid handle");
 
         let err_msg = result.unwrap_err();

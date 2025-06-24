@@ -44,7 +44,7 @@ pub async fn run_vm(setup: VmSetup) -> Result<(), String> {
     }
 
     // 3. Setup the partition (apply all configured properties)
-    if let Err(e) = setup_partition(partition.get_whv_partition_handle()) {
+    if let Err(e) = setup_partition(&partition) {
         return Err(format!("Failed to setup partition: {:?}", e));
     }
 
