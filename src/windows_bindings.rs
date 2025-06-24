@@ -10,6 +10,44 @@ use windows::Win32::System::SystemInformation::{GlobalMemoryStatusEx, MEMORYSTAT
 use windows::core::HRESULT;
 use windows::Win32::System::Memory::{VirtualAlloc, MEM_COMMIT, MEM_RESERVE, PAGE_READWRITE};
 
+/// A safe wrapper around a WHV_PARTITION_HANDLE.
+///
+/// This struct owns a hypervisor partition handle and ensures
+/// it is properly cleaned up when dropped.
+pub struct Partition {
+    // The raw hypervisor partition handle.
+    partition: WHV_PARTITION_HANDLE,
+}
+
+impl Partition {
+    /// Creates a new `Partition` from a raw `WHV_PARTITION_HANDLE`.
+    ///
+    /// # Safety
+    /// The caller must ensure that the handle is valid and not used elsewhere.
+    /// This struct assumes ownership and will delete the partition on drop.
+    pub fn new(partition: WHV_PARTITION_HANDLE) -> Self {
+        Partition { partition }
+    }
+
+    /// Returns the raw `WHV_PARTITION_HANDLE` for use with FFI functions.
+    ///
+    /// This does not transfer ownership — the caller must not delete
+    /// or close the handle manually.
+    pub fn get_whv_partition_handle(&self) -> WHV_PARTITION_HANDLE {
+        self.partition
+    }
+}
+
+impl Drop for Partition {
+    /// Automatically deletes the partition when the `Partition` is dropped.
+    ///
+    /// This ensures proper resource cleanup through the Windows Hypervisor API.
+    fn drop(&mut self) {
+        // SAFETY: This is safe because we own the handle and Drop is only called once.
+        delete_partition(self.partition);
+    }
+}
+
 /// Retrieves total and available physical memory on the host system.
 /// Returns a tuple: (total_physical_memory_bytes, available_physical_memory_bytes)
 fn get_physical_memory_info() -> Result<(u64, u64), String> {
@@ -154,6 +192,20 @@ pub fn run_vcpu(partition: WHV_PARTITION_HANDLE, cpu_id: u32) -> Result<WHV_RUN_
 mod tests {
     use super::*;
     use std::mem::size_of;
+
+    #[test]
+    fn test_partition_wraps_handle() {
+
+        // SAFETY: We're calling a Windows API. Make sure the hypervisor is enabled.
+        let result = unsafe { WHvCreatePartition() };
+        let result = result.unwrap();
+
+        let partition = Partition::new(result);
+
+        assert_eq!(partition.get_whv_partition_handle(), result);
+
+        // When `partition` goes out of scope, Drop will call `WHvDeletePartition`
+    }
 
     /// Test retrieving physical memory information succeeds and yields sane values
     #[test]
