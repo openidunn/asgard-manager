@@ -165,8 +165,8 @@ pub fn allocate_partition_memory(partition: &Partition, mem_size: u64) -> Result
 
 /// Creates a virtual CPU (vCPU) in the given partition with the specified CPU ID.
 /// Returns Ok on success or error string on failure.
-pub fn create_vcpu(partition: WHV_PARTITION_HANDLE, cpu_id: u32) -> Result<(), String> {
-    let hresult = unsafe { WHvCreateVirtualProcessor(partition, cpu_id, 0) };
+pub fn create_vcpu(partition: &Partition, cpu_id: u32) -> Result<(), String> {
+    let hresult = unsafe { WHvCreateVirtualProcessor(partition.get_whv_partition_handle(), cpu_id, 0) };
     if let Err(e) = hresult {
         return Err(format!("Failed to create virtual processor: {:?}", e));
     }
@@ -421,26 +421,24 @@ mod tests {
     #[test]
     fn test_create_vcpu_success() {
         unsafe {
-            let partition = WHvCreatePartition().expect("Failed to create partition");
+            let partition = create_partition().expect("Failed to create partition");
 
             // Set required processor count property and setup partition
             let processor_count: u32 = 1;
             let result = WHvSetPartitionProperty(
-                partition,
+                partition.get_whv_partition_handle(),
                 WHvPartitionPropertyCodeProcessorCount,
                 &processor_count as *const _ as *const _,
                 std::mem::size_of::<u32>() as u32,
             );
             assert!(result.is_ok(), "Failed to set processor count: {:?}", result);
 
-            let setup_result = WHvSetupPartition(partition);
+            let setup_result = WHvSetupPartition(partition.get_whv_partition_handle());
             assert!(setup_result.is_ok(), "Failed to set up partition: {:?}", setup_result);
 
             // Create the virtual processor with id 0
-            let result = create_vcpu(partition, 0);
+            let result = create_vcpu(&partition, 0);
             assert!(result.is_ok(), "create_vcpu failed: {:?}", result);
-
-            let _ = WHvDeletePartition(partition);
         }
     }
 
@@ -450,7 +448,8 @@ mod tests {
         unsafe {
             // Intentionally pass an invalid/null handle
             let fake_partition: WHV_PARTITION_HANDLE = WHV_PARTITION_HANDLE::default();
-            let result = create_vcpu(fake_partition, 0);
+            let partition = Partition::new(fake_partition);
+            let result = create_vcpu(&partition, 0);
 
             assert!(
                 result.is_err(),
@@ -489,7 +488,7 @@ mod tests {
         assert!(alloc_result.is_ok(), "allocate_partition_memory failed: {:?}", alloc_result.err());
 
         // Create virtual processor
-        let create_vcpu_result = create_vcpu(partition.get_whv_partition_handle(), 0);
+        let create_vcpu_result = create_vcpu(&partition, 0);
         assert!(create_vcpu_result.is_ok(), "create_vcpu failed: {:?}", create_vcpu_result.err());
 
         // Run the virtual processor

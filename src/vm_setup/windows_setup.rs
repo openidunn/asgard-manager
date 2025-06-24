@@ -7,6 +7,7 @@ use windows::Win32::System::Hypervisor::{
 };
 use crate::vm_setup::setup_utils::VmSetup;
 use super::super::windows_bindings::*;
+use std::sync::Arc;
 use tokio::task;
 
 /// Asynchronously runs a virtual machine configured by `setup`.
@@ -32,8 +33,8 @@ use tokio::task;
 ///
 pub async fn run_vm(setup: VmSetup) -> Result<(), String> {
     // 1. Create a new partition (virtual machine container)
-    let partition: Partition = match create_partition() {
-        Ok(p) => p,
+    let partition = match create_partition() {
+        Ok(p) => Arc::new(p),
         Err(e) => return Err(format!("Partition creation failed: {:?}", e)),
     };
 
@@ -57,19 +58,19 @@ pub async fn run_vm(setup: VmSetup) -> Result<(), String> {
     let mut handlers: Vec<tokio::task::JoinHandle<Result<String, String>>> = Vec::new();
     for cpu_id in 0..setup.get_cpu_cores_count() {
         // Clone the partition handle for each task (handle is Copy)
-        let ph = partition.get_whv_partition_handle().clone();
+        let ph = Arc::clone(&partition);
 
         // Spawn a blocking task for each vCPU to avoid blocking async runtime
         handlers.push(task::spawn_blocking(move || -> Result<String, String> {
             // Create the vCPU within the partition with the given CPU id
-            if let Err(e) = create_vcpu(ph, cpu_id as u32) {
+            if let Err(e) = create_vcpu(&ph, cpu_id as u32) {
                 return Err(format!("Failed to create VCPU {}: {:?}", cpu_id, e));
             };
 
             // Enter an execution loop for this vCPU
             loop {
                 // Run the vCPU until it exits for some reason
-                let exit_ctx = match run_vcpu(ph, cpu_id) {
+                let exit_ctx = match run_vcpu(ph.get_whv_partition_handle(), cpu_id) {
                     Ok(exit_ctx) => exit_ctx,
                     Err(e) => return Err(format!("VCPU {} failed to run: {:?}", cpu_id, e))
                 };
