@@ -5,3 +5,6 @@ pub mod macos_setup_tests;
 
 #[cfg(target_os = "linux")]
 pub mod linux_setup_tests;
+
+#[cfg(target_os = "windows")]
+pub mod windows_setup_tests;
