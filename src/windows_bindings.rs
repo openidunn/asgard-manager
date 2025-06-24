@@ -98,7 +98,7 @@ pub fn set_processor_count_property(partition: &Partition, processor_count: u32)
 
 /// Deletes the given partition handle, cleaning up resources.
 /// Returns Ok on success or an error string on failure.
-pub fn delete_partition(partition: WHV_PARTITION_HANDLE) -> Result<(), String> {
+fn delete_partition(partition: WHV_PARTITION_HANDLE) -> Result<(), String> {
     if let Err(e) = unsafe { WHvDeletePartition(partition) } {
         return Err(format!("{:?}", e))
     }
