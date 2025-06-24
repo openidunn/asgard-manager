@@ -120,7 +120,7 @@ pub fn setup_partition(partition: &Partition) -> Result<(), String> {
 /// - `partition`: Partition handle to map memory into.
 /// - `mem_size`: Size of memory to allocate and map (in bytes).
 /// Returns Ok on success or error string on failure.
-pub fn allocate_partition_memory(partition: WHV_PARTITION_HANDLE, mem_size: u64) -> Result<(), String> {
+pub fn allocate_partition_memory(partition: &Partition, mem_size: u64) -> Result<(), String> {
     // Get host memory info
     let (total_mem, avail_mem) = match get_physical_memory_info() {
         Ok((total_mem, avail_mem)) => (total_mem, avail_mem),
@@ -154,7 +154,7 @@ pub fn allocate_partition_memory(partition: WHV_PARTITION_HANDLE, mem_size: u64)
 
     // Map the allocated host memory into the guest physical address space starting at GPA 0
     let result = unsafe {
-        WHvMapGpaRange(partition, ptr as *mut _, 0x0000, mem_size, flags)
+        WHvMapGpaRange(partition.get_whv_partition_handle(), ptr as *mut _, 0x0000, mem_size, flags)
     };
 
     match result {
@@ -371,54 +371,50 @@ mod tests {
     /// Test successful allocation and mapping of memory to a partition
     #[test]
     fn test_allocate_partition_memory_success() {
-        let partition: WHV_PARTITION_HANDLE = unsafe { WHvCreatePartition() }.expect("Failed to create partition");
+        let partition = create_partition().expect("Failed to create partition");
 
         // Set processor count and setup partition before allocating memory
         let cpu_count: u32 = 1;
         unsafe {
             WHvSetPartitionProperty(
-                partition,
+                partition.get_whv_partition_handle(),
                 WHvPartitionPropertyCodeProcessorCount,
                 &cpu_count as *const _ as *const _,
                 size_of::<u32>() as u32,
             ).expect("Failed to set processor count");
 
-            WHvSetupPartition(partition).expect("Failed to setup partition");
+            WHvSetupPartition(partition.get_whv_partition_handle()).expect("Failed to setup partition");
         }
 
         // Attempt to allocate 4KB of memory
-        let result = allocate_partition_memory(partition, 4096);
+        let result = allocate_partition_memory(&partition, 4096);
         assert!(result.is_ok(), "Expected success, got error: {:?}", result.err());
-
-        unsafe { WHvDeletePartition(partition) };
     }
 
     /// Test memory allocation failure due to insufficient available memory
     #[test]
     fn test_allocate_partition_memory_insufficient_memory() {
-        let partition: WHV_PARTITION_HANDLE = unsafe { WHvCreatePartition() }.expect("Failed to create partition");
+        let partition = create_partition().expect("Failed to create partition");
 
         let cpu_count: u32 = 1;
         unsafe {
             WHvSetPartitionProperty(
-                partition,
+                partition.get_whv_partition_handle(),
                 WHvPartitionPropertyCodeProcessorCount,
                 &cpu_count as *const _ as *const _,
                 size_of::<u32>() as u32,
             ).expect("Failed to set processor count");
 
-            WHvSetupPartition(partition).expect("Failed to setup partition");
+            WHvSetupPartition(partition.get_whv_partition_handle()).expect("Failed to setup partition");
         }
 
         // Request an absurdly large allocation, guaranteed to fail
-        let result = allocate_partition_memory(partition, u64::MAX);
+        let result = allocate_partition_memory(&partition, u64::MAX);
         assert!(result.is_err());
         assert!(
             result.as_ref().unwrap_err().contains("not enough available memory"),
             "Unexpected error: {:?}", result
         );
-
-        unsafe { WHvDeletePartition(partition) };
     }
 
     /// Test successful creation of a virtual CPU
@@ -466,13 +462,13 @@ mod tests {
     /// Test running a vCPU through the full lifecycle of partition setup, memory mapping, vCPU creation, and execution
     #[test]
     fn test_run_vcpu_success() {
-        let partition = unsafe { WHvCreatePartition() }.expect("WHvCreatePartition failed");
+        let partition = create_partition().expect("WHvCreatePartition failed");
 
         // Set processor count property
         let processor_count: u32 = 1;
         let set_result = unsafe {
             WHvSetPartitionProperty(
-                partition,
+                partition.get_whv_partition_handle(),
                 WHvPartitionPropertyCodeProcessorCount,
                 &processor_count as *const _ as *const _,
                 size_of::<u32>() as u32,
@@ -485,28 +481,24 @@ mod tests {
         );
 
         // Setup partition
-        let setup_result = unsafe { WHvSetupPartition(partition) };
+        let setup_result = unsafe { WHvSetupPartition(partition.get_whv_partition_handle()) };
         assert!(setup_result.is_ok(), "WHvSetupPartition failed: {:?}", setup_result.err());
 
         // Allocate and map memory (4 KB)
-        let alloc_result = allocate_partition_memory(partition, 4096);
+        let alloc_result = allocate_partition_memory(&partition, 4096);
         assert!(alloc_result.is_ok(), "allocate_partition_memory failed: {:?}", alloc_result.err());
 
         // Create virtual processor
-        let create_vcpu_result = create_vcpu(partition, 0);
+        let create_vcpu_result = create_vcpu(partition.get_whv_partition_handle(), 0);
         assert!(create_vcpu_result.is_ok(), "create_vcpu failed: {:?}", create_vcpu_result.err());
 
         // Run the virtual processor
-        let run_result = run_vcpu(partition, 0);
+        let run_result = run_vcpu(partition.get_whv_partition_handle(), 0);
         assert!(
             run_result.is_ok(),
             "WHvRunVirtualProcessor failed: {:?}",
             run_result.err()
         );
-
-        // Cleanup
-        let del_result = unsafe { WHvDeletePartition(partition) };
-        assert!(del_result.is_ok(), "WHvDeletePartition failed: {:?}", del_result.err());
     }
 
     /// Test running a vCPU with an invalid partition handle should fail

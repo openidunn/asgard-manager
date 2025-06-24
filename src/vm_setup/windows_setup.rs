@@ -49,7 +49,7 @@ pub async fn run_vm(setup: VmSetup) -> Result<(), String> {
     }
 
     // 4. Allocate and map guest physical memory for the partition
-    if let Err(e) = allocate_partition_memory(partition.get_whv_partition_handle(), setup.get_memory_size() as u64) {
+    if let Err(e) = allocate_partition_memory(&partition, setup.get_memory_size() as u64) {
         return Err(format!("Failed to allocate and map guest memory: {:?}", e));
     }
 
