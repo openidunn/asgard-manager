@@ -76,7 +76,7 @@ pub fn create_partition() -> Result<Partition, String> {
 /// Sets the processor count property for a given partition.
 /// Valid processor_count range is 1 to 64 (inclusive).
 /// Returns Ok on success or an error string on failure.
-pub fn set_processor_count_property(partition: WHV_PARTITION_HANDLE, processor_count: u32) -> Result<(), String> {
+pub fn set_processor_count_property(partition: &Partition, processor_count: u32) -> Result<(), String> {
     // Validate processor count
     if processor_count == 0 || processor_count > 64 {
         return Err(format!("Failed to set processor count: processor_count equal to {}", processor_count));
@@ -84,7 +84,7 @@ pub fn set_processor_count_property(partition: WHV_PARTITION_HANDLE, processor_c
     // Attempt to set the property on the partition
     if let Err(e) = unsafe {
         WHvSetPartitionProperty(
-            partition,
+            partition.get_whv_partition_handle(),
             WHvPartitionPropertyCodeProcessorCount,
             &processor_count as *const _ as *const _,
             std::mem::size_of::<u32>() as u32,
@@ -277,23 +277,21 @@ mod tests {
     /// Test setting a valid processor count property on a partition
     #[test]
     fn test_set_processor_count_property_valid() {
-        let partition = unsafe { WHvCreatePartition() }.expect("Partition creation failed");
-        let result = set_processor_count_property(partition, 2);
+        let partition = create_partition().expect("Partition creation failed");
+        let result = set_processor_count_property(&partition, 2);
         assert!(result.is_ok(), "Should succeed for valid processor count");
-        let _ = unsafe { WHvDeletePartition(partition) };
     }
 
     /// Test that setting zero processor count returns an error
     #[test]
     fn test_set_processor_count_property_zero() {
-        let partition = unsafe { WHvCreatePartition() }.expect("Partition creation failed");
-        let result = set_processor_count_property(partition, 0);
+        let partition = create_partition().expect("Partition creation failed");
+        let result = set_processor_count_property(&partition, 0);
         assert!(result.is_err(), "Should fail for processor_count == 0");
         assert_eq!(
             result.unwrap_err(),
             "Failed to set processor count: processor_count equal to 0"
         );
-        let _ = unsafe { WHvDeletePartition(partition) };
     }
 
     /// Test setting processor count with invalid (zeroed) partition handle fails
@@ -301,18 +299,18 @@ mod tests {
     fn test_set_processor_count_property_invalid_partition() {
         // Create an invalid handle (zeroed)
         let invalid_partition = WHV_PARTITION_HANDLE::default();
-        let result = set_processor_count_property(invalid_partition, 2);
+        let partition = Partition::new(invalid_partition);
+        let result = set_processor_count_property(&partition, 2);
         assert!(result.is_err(), "Should fail for invalid partition handle");
     }
 
     /// Test setting an excessively large processor count returns an error
     #[test]
     fn test_set_processor_count_property_large_count() {
-        let partition = unsafe { WHvCreatePartition() }.expect("Partition creation failed");
+        let partition = create_partition().expect("Partition creation failed");
         // Use a very large processor count, likely to be invalid on most systems
-        let result = set_processor_count_property(partition, 1024);
+        let result = set_processor_count_property(&partition, 1024);
         assert!(result.is_err(), "Should fail for unreasonably large processor count");
-        let _ = unsafe { WHvDeletePartition(partition) };
     }
 
     /// Test setting processor count property and successful partition setup

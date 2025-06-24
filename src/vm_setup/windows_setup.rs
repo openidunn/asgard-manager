@@ -39,7 +39,7 @@ pub async fn run_vm(setup: VmSetup) -> Result<(), String> {
 
     // 2. Set the number of virtual processors for the partition
     let processor_count = setup.get_cpu_cores_count() as u32;
-    if let Err(e) = set_processor_count_property(partition.get_whv_partition_handle(), setup.get_cpu_cores_count()) {
+    if let Err(e) = set_processor_count_property(&partition, setup.get_cpu_cores_count()) {
         return Err(format!("Failed to set processor count: {:?}", e));
     }
 
