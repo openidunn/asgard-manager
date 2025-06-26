@@ -3,7 +3,7 @@ use memmap2::{MmapOptions, MmapMut};
 
 fn create_disk_image(path: &str, size: u64) -> Result<(), String> {
     let path_with_img_extension = format!("{}{}", path, ".img");
-    let mut file = match OpenOptions::new()
+    let file = match OpenOptions::new()
         .write(true)          // Open the file with write access
         .create(true)         // Create the file if it doesn't exist
         .open(&path_with_img_extension.as_str()) { // Try to open it, or return an error
@@ -18,7 +18,7 @@ fn create_disk_image(path: &str, size: u64) -> Result<(), String> {
     Ok(())
 }
 
-pub fn map_disk_image(path: &str) -> Result<memmap2::MmapMut, String> {
+pub fn map_disk_image(path: &str) -> Result<MmapMut, String> {
     // Open the disk image file for read and write
     if !path.ends_with(".img") {
         return Err(format!("passed path is not path to .img file"));
