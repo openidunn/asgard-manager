@@ -74,7 +74,7 @@ pub fn check_if_linux_distribution_img_present_in_current_dir(distribution: Dist
     Err(format!("{} image file not found in this directory", distribution.as_str()))
 }
 
-pub fn download_ubuntu_lts_image(distribution: Distribution) -> Result<(), String> {
+pub fn download_linux_lts_image(distribution: Distribution) -> Result<(), String> {
     match check_if_linux_distribution_img_present_in_current_dir(distribution) {
         Ok(_) => {
             let filename = format!("{}-lts.img", distribution.as_str());
