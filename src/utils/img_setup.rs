@@ -2,7 +2,7 @@ use std::fs::{File, read_dir};
 use reqwest::blocking::Client;
 use std::env;
 
-#[derive(Eq, PartialEq, Hash, Debug, Copy, Clone)]
+#[derive(Copy, Clone)]
 pub enum Distribution {
     Debian, Ubuntu, Mint
 }

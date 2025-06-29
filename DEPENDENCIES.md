@@ -10,3 +10,4 @@
 | virtio-bindings 0.2.0 | "BSD-3-Clause OR Apache-2.0" |
 | memmap2 0.9.0 | "MIT OR Apache-2.0" |
 | reqwest 0.10.0 | "MIT OR Apache-2.0" |
+| vmm-sys-util 0.14.0 | "BSD-3-Clause" |
