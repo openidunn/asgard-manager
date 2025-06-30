@@ -35,6 +35,14 @@ fn detect_architecture() -> Architecture {
     }
 }
 
+fn distribution_img_extension(distribution: Distribution) -> &'static str {
+    match distribution {
+        Distribution::Debian => ".qcow2",
+        Distribution::Ubuntu => ".img",
+        Distribution::Mint => ".iso",
+    }
+}
+
 fn get_url_to_linux_distribution_download(distribution: Distribution) -> Result<String, String> {
     let cpu_architecture = detect_architecture();
 
@@ -66,7 +74,7 @@ pub fn check_if_linux_distribution_img_present_in_current_dir(distribution: Dist
             Err(e) => return Err(format!("{:?}", e))
         };
         let filename = entry.file_name().to_string_lossy().into_owned();
-        if filename.contains(distribution.as_str()) && filename.ends_with(".img") {
+        if filename.contains(distribution.as_str()) && filename.ends_with(distribution_img_extension(distribution)) {
             return Ok(());
         }
     }
@@ -140,6 +148,13 @@ mod tests {
     }
 
     #[test]
+    fn test_distribution_img_extension() {
+        assert_eq!(distribution_img_extension(Distribution::Debian), ".qcow2");
+        assert_eq!(distribution_img_extension(Distribution::Ubuntu), ".img");
+        assert_eq!(distribution_img_extension(Distribution::Mint), ".iso");
+    }
+
+    #[test]
     fn test_get_url_to_linux_distribution_download_known_arch() {
         let result = get_url_to_linux_distribution_download(Distribution::Ubuntu);
         assert!(result.is_ok());
@@ -152,13 +167,48 @@ mod tests {
     fn test_check_if_linux_distribution_img_present_in_current_dir_found() {
         let (original_dir, temp_dir) = setup_temp_test_dir("test_img_present");
 
-        // Create dummy image file
-        let file_path = temp_dir.join("ubuntu-lts.img");
+        // Create dummy image file with correct extension for Ubuntu
+        let extension = distribution_img_extension(Distribution::Ubuntu);
+        let file_path = temp_dir.join(format!("ubuntu-lts{}", extension));
         let mut file = File::create(&file_path).unwrap();
         writeln!(file, "dummy image").unwrap();
 
         std::env::set_current_dir(&temp_dir).unwrap();
         let result = check_if_linux_distribution_img_present_in_current_dir(Distribution::Ubuntu);
+        assert!(result.is_ok());
+
+        cleanup_and_restore(original_dir, temp_dir);
+    }
+
+    #[test]
+    fn test_check_if_linux_distribution_img_present_in_current_dir_found_debian() {
+        let (original_dir, temp_dir) = setup_temp_test_dir("test_img_present_debian");
+
+        // Create dummy image file with correct extension for Debian
+        let extension = distribution_img_extension(Distribution::Debian);
+        let file_path = temp_dir.join(format!("debian-server{}", extension));
+        let mut file = File::create(&file_path).unwrap();
+        writeln!(file, "dummy debian image").unwrap();
+
+        std::env::set_current_dir(&temp_dir).unwrap();
+        let result = check_if_linux_distribution_img_present_in_current_dir(Distribution::Debian);
+        assert!(result.is_ok());
+
+        cleanup_and_restore(original_dir, temp_dir);
+    }
+
+    #[test]
+    fn test_check_if_linux_distribution_img_present_in_current_dir_found_mint() {
+        let (original_dir, temp_dir) = setup_temp_test_dir("test_img_present_mint");
+
+        // Create dummy image file with correct extension for Mint
+        let extension = distribution_img_extension(Distribution::Mint);
+        let file_path = temp_dir.join(format!("mint-cinnamon{}", extension));
+        let mut file = File::create(&file_path).unwrap();
+        writeln!(file, "dummy mint image").unwrap();
+
+        std::env::set_current_dir(&temp_dir).unwrap();
+        let result = check_if_linux_distribution_img_present_in_current_dir(Distribution::Mint);
         assert!(result.is_ok());
 
         cleanup_and_restore(original_dir, temp_dir);
@@ -183,18 +233,38 @@ mod tests {
     }
 
     #[test]
-    fn test_check_if_linux_distribution_img_present_with_similar_names_but_wrong_extension() {
-        let (original_dir, temp_dir) = setup_temp_test_dir("test_img_similar_name_wrong_extension");
+    fn test_check_if_linux_distribution_img_present_with_wrong_extension() {
+        let (original_dir, temp_dir) = setup_temp_test_dir("test_img_wrong_extension");
 
         // Create a file that contains the distro name but wrong extension
+        // Ubuntu should have .img, but we create .iso
         let file_path = temp_dir.join("ubuntu-lts.iso");
         let mut file = File::create(&file_path).unwrap();
         writeln!(file, "dummy iso").unwrap();
 
         env::set_current_dir(&temp_dir).unwrap();
 
-        // Should not find .img files, so returns Err
+        // Should not find .img files for Ubuntu, so returns Err
         let result = check_if_linux_distribution_img_present_in_current_dir(Distribution::Ubuntu);
+        assert!(result.is_err());
+
+        cleanup_and_restore(original_dir, temp_dir);
+    }
+
+    #[test]
+    fn test_check_if_linux_distribution_img_present_with_wrong_extension_debian() {
+        let (original_dir, temp_dir) = setup_temp_test_dir("test_img_wrong_extension_debian");
+
+        // Create a file that contains the distro name but wrong extension
+        // Debian should have .qcow2, but we create .img
+        let file_path = temp_dir.join("debian-server.img");
+        let mut file = File::create(&file_path).unwrap();
+        writeln!(file, "dummy img").unwrap();
+
+        env::set_current_dir(&temp_dir).unwrap();
+
+        // Should not find .qcow2 files for Debian, so returns Err
+        let result = check_if_linux_distribution_img_present_in_current_dir(Distribution::Debian);
         assert!(result.is_err());
 
         cleanup_and_restore(original_dir, temp_dir);
@@ -205,7 +275,8 @@ mod tests {
         let (original_dir, temp_dir) = setup_temp_test_dir("test_img_case_sensitive");
 
         // Create .img file with uppercase distribution name (should NOT match if case-sensitive)
-        let file_path = temp_dir.join("Ubuntu-lts.img");
+        let extension = distribution_img_extension(Distribution::Ubuntu);
+        let file_path = temp_dir.join(format!("Ubuntu-lts{}", extension));
         let mut file = File::create(&file_path).unwrap();
         writeln!(file, "dummy img").unwrap();
 
@@ -214,6 +285,37 @@ mod tests {
         // Should NOT find, assuming case-sensitive matching
         let result = check_if_linux_distribution_img_present_in_current_dir(Distribution::Ubuntu);
         assert!(result.is_err());
+
+        cleanup_and_restore(original_dir, temp_dir);
+    }
+
+    #[test]
+    fn test_check_if_linux_distribution_img_present_multiple_files() {
+        let (original_dir, temp_dir) = setup_temp_test_dir("test_img_multiple_files");
+
+        // Create multiple files, one with correct distribution and extension
+        let mut file1 = File::create(temp_dir.join("some-random-file.txt")).unwrap();
+        writeln!(file1, "random content").unwrap();
+
+        let mut file2 = File::create(temp_dir.join("ubuntu-desktop.img")).unwrap();
+        writeln!(file2, "ubuntu image").unwrap();
+
+        let mut file3 = File::create(temp_dir.join("debian-server.qcow2")).unwrap();
+        writeln!(file3, "debian image").unwrap();
+
+        env::set_current_dir(&temp_dir).unwrap();
+
+        // Should find Ubuntu .img file
+        let result_ubuntu = check_if_linux_distribution_img_present_in_current_dir(Distribution::Ubuntu);
+        assert!(result_ubuntu.is_ok());
+
+        // Should find Debian .qcow2 file
+        let result_debian = check_if_linux_distribution_img_present_in_current_dir(Distribution::Debian);
+        assert!(result_debian.is_ok());
+
+        // Should NOT find Mint .iso file
+        let result_mint = check_if_linux_distribution_img_present_in_current_dir(Distribution::Mint);
+        assert!(result_mint.is_err());
 
         cleanup_and_restore(original_dir, temp_dir);
     }
