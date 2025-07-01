@@ -2,39 +2,46 @@ use std::fs::{File, read_dir};
 use reqwest::blocking::Client;
 use std::env;
 
+/// Supported Linux distributions
 #[derive(Copy, Clone)]
 pub enum Distribution {
-    Debian, Ubuntu, Mint
+    Debian,
+    Ubuntu,
+    Mint,
 }
 
 impl Distribution {
+    /// Returns a lowercase string representation of the distribution
     pub fn as_str(&self) -> &str {
         match self {
             Distribution::Debian => "debian",
             Distribution::Ubuntu => "ubuntu",
-            Distribution::Mint => "mint"
+            Distribution::Mint => "mint",
         }
     }
 }
 
+/// CPU architecture enumeration for image compatibility
 enum Architecture {
-    X86,      // 32-bit
+    X86,      // 32-bit Intel/AMD
     X86_64,   // 64-bit Intel/AMD
     ARM,      // 32-bit ARM
-    ARM64,    // aarch64 (Apple Silicon, modern ARM servers)
-    Unknown,
+    ARM64,    // 64-bit ARM (Apple Silicon, ARM servers)
+    Unknown,  // Unrecognized architecture
 }
 
+/// Detects the current system architecture using compile-time constants
 fn detect_architecture() -> Architecture {
     match env::consts::ARCH {
         "x86" => Architecture::X86,
         "x86_64" => Architecture::X86_64,
         "arm" => Architecture::ARM,
         "aarch64" => Architecture::ARM64,
-        _ => Architecture::Unknown
+        _ => Architecture::Unknown,
     }
 }
 
+/// Maps a distribution to its expected disk image file extension
 fn distribution_img_extension(distribution: Distribution) -> &'static str {
     match distribution {
         Distribution::Debian => ".qcow2",
@@ -43,6 +50,7 @@ fn distribution_img_extension(distribution: Distribution) -> &'static str {
     }
 }
 
+/// Returns a direct download URL for a given distribution, based on detected architecture
 fn get_url_to_linux_distribution_download(distribution: Distribution) -> Result<String, String> {
     let cpu_architecture = detect_architecture();
 
@@ -61,17 +69,17 @@ fn get_url_to_linux_distribution_download(distribution: Distribution) -> Result<
     }
 }
 
+/// Checks whether an image file for the specified distribution is present in the current directory
 pub fn check_if_linux_distribution_img_present_in_current_dir(distribution: Distribution) -> Result<(), String> {
-
     let entries = match read_dir(".") {
         Ok(entries) => entries,
-        Err(e) => return Err(format!("{:?}", e))
+        Err(e) => return Err(format!("{:?}", e)),
     };
 
     for entry in entries {
         let entry = match entry {
             Ok(entry) => entry,
-            Err(e) => return Err(format!("{:?}", e))
+            Err(e) => return Err(format!("{:?}", e)),
         };
         let filename = entry.file_name().to_string_lossy().into_owned();
         if filename.contains(distribution.as_str()) && filename.ends_with(distribution_img_extension(distribution)) {
@@ -82,35 +90,41 @@ pub fn check_if_linux_distribution_img_present_in_current_dir(distribution: Dist
     Err(format!("{} image file not found in this directory", distribution.as_str()))
 }
 
+/// Downloads the Linux image for the specified distribution, if not already present
 pub fn download_linux_lts_image(distribution: Distribution) -> Result<(), String> {
     match check_if_linux_distribution_img_present_in_current_dir(distribution) {
         Ok(_) => {
             let filename = format!("{}-lts.img", distribution.as_str());
-            // URL for Ubuntu 22.04 LTS cloud image (amd64)
+
+            // Get the download URL for the specified distribution and architecture
             let url = match get_url_to_linux_distribution_download(distribution) {
                 Ok(url) => url,
-                Err(e) => return Err(format!("{:?}", e))
-            };
-            // Create HTTP client
-            let client = Client::new();
-            // Send GET request
-            let mut response = match client.get(&url).send() {
-                Ok(response) => response,
-                Err(e) => return Err(format!("{:?}", e))
-            };
-            // Open file for writing
-            let mut file = match File::create(filename) {
-                Ok(file) => file,
-                Err(e) => return Err(format!("{:?}", e))
-            };
-            // Copy response bytes to the file
-            if let Err(e) = std::io::copy(&mut response, &mut file) {
-                return Err(format!("{:?}", e));
+                Err(e) => return Err(format!("{:?}", e)),
             };
 
+            // Create a blocking HTTP client
+            let client = Client::new();
+
+            // Send the HTTP GET request
+            let mut response = match client.get(&url).send() {
+                Ok(response) => response,
+                Err(e) => return Err(format!("{:?}", e)),
+            };
+
+            // Open a local file for writing the image
+            let mut file = match File::create(filename) {
+                Ok(file) => file,
+                Err(e) => return Err(format!("{:?}", e)),
+            };
+
+            // Copy the downloaded bytes to the local file
+            if let Err(e) = std::io::copy(&mut response, &mut file) {
+                return Err(format!("{:?}", e));
+            }
+
             Ok(())
-        },
-        Err(e) => Err(format!("{:?}", e))
+        }
+        Err(e) => Err(format!("{:?}", e)),
     }
 }
 
