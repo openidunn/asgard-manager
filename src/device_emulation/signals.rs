@@ -25,6 +25,18 @@ impl Interrupt {
             Err(e) => Err(format!("{:?}", e))
         }
     }
+
+    pub fn get_irqfd(&self) -> &EventFd {
+        &self.irqfd
+    }
+
+    pub fn get_vm(&self) -> &VmFd {
+        &self.vm_fd
+    }
+
+    pub fn get_gsi(&self) -> u32 {
+        self.gsi
+    }
 }
 
 #[cfg(test)]

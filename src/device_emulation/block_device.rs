@@ -1,6 +1,6 @@
 use virtio_bindings::virtio_mmio::VIRTIO_MMIO_QUEUE_NOTIFY;
 use virtio_bindings::virtio_blk::*;
-use virtio_queue::{Queue, QueueT, QueueSync};
+use virtio_queue::{QueueT, QueueSync};
 use vm_memory::{Bytes, GuestMemoryMmap, Address};
 use memmap2::MmapMut;
 use std::cell::RefCell;
@@ -64,7 +64,7 @@ impl VirtioBlockDevice {
     }
 
     pub fn process_descriptor_chain(&self) {
-        let mut memory = self.mem.borrow_mut();
+        let memory = self.mem.borrow_mut();
         let mut que = self.queue.borrow_mut();
         if !que.ready() {
             return;
