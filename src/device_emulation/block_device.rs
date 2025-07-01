@@ -4,7 +4,7 @@ use virtio_queue::{QueueT, QueueSync};
 use vm_memory::{Bytes, GuestMemoryMmap, Address};
 use memmap2::MmapMut;
 use std::cell::RefCell;
-use super::signals::Interrupt;
+use super::super::utils::signals::linux::Interrupt;
 
 pub struct VirtioBlockDevice {
     pub mem: RefCell<GuestMemoryMmap>,

@@ -42,8 +42,7 @@ impl Interrupt {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use kvm_ioctls::{Kvm, VmFd};
-    use vmm_sys_util::eventfd::EventFd;
+    use kvm_ioctls::{Kvm};
 
     // Helper to create a VmFd with IRQ chip initialized
     fn create_vm_fd() -> VmFd {
