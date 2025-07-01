@@ -1,5 +1,5 @@
 use std::path::Path;
-use AsgardManager::utils::kernel_setup::extract_kernel_components_from_qcow2;
+use AsgardManager::kernel_setup::linux_setup::extract_kernel_components_from_qcow2;
 
 #[test]
 fn test_extract_kernel_invalid_path() {

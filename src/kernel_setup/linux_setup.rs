@@ -1,12 +1,7 @@
 use tempfile::TempDir;
 use std::fs::{read, create_dir, read_dir};
 use std::process::Command;
-
-#[derive(Debug)]
-pub struct KernelComponents {
-    pub kernel: Vec<u8>,
-    pub initrd: Option<Vec<u8>>
-}
+use super::setup_utils::KernelComponents;
 
 pub fn extract_kernel_components_from_qcow2(qcow2_path: &str) -> Result<KernelComponents, String> {
     let temp_dir = match TempDir::new() {
