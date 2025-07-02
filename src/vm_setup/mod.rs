@@ -8,3 +8,4 @@ pub mod linux_setup;
 pub mod windows_setup;
 
 pub mod setup_utils;
+mod disk_setup;
