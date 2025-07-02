@@ -4,8 +4,8 @@ use memmap2::MmapMut;
 use vm_memory::{GuestMemoryMmap, GuestAddress};
 use virtio_queue::QueueT;
 use kvm_ioctls::{Kvm, VmFd};
-use AsgardManager::device_emulation::block_device::VirtioBlockDevice; // Adjust crate path as needed
-use AsgardManager::device_emulation::signals::Interrupt;
+use AsgardManager::device_emulation::block_device::linux::VirtioBlockDevice; // Adjust crate path as needed
+use AsgardManager::utils::signals::linux::Interrupt;
 
 // Helper: create guest memory of 64 KiB at address 0
 fn create_guest_memory() -> GuestMemoryMmap {
@@ -103,7 +103,7 @@ fn test_virtio_block_device_invalid_queue() {
     let interrupt = create_real_interrupt();
 
     // Create a device but manually set queue ready to false to simulate invalid queue
-    let mut device = VirtioBlockDevice::new(mem, disk_image, 0x1000, interrupt).expect("Failed to create device");
+    let device = VirtioBlockDevice::new(mem, disk_image, 0x1000, interrupt).expect("Failed to create device");
 
     {
         let mut queue = device.queue.borrow_mut();
@@ -143,7 +143,7 @@ fn test_virtio_block_device_process_descriptor_chain_invalid_request_type() {
 #[test]
 fn test_virtio_block_device_read_write_disk_image_bounds() {
     let mem = create_guest_memory();
-    let mut disk_image = create_disk_image(512 * 1024);
+    let disk_image = create_disk_image(512 * 1024);
     let interrupt = create_real_interrupt();
 
     let device = VirtioBlockDevice::new(mem, disk_image, 0x1000, interrupt).expect("Failed to create device");

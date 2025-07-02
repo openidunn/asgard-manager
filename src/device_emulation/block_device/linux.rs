@@ -4,7 +4,7 @@ use virtio_queue::{QueueT, QueueSync};
 use vm_memory::{Bytes, GuestMemoryMmap, Address};
 use memmap2::MmapMut;
 use std::cell::RefCell;
-use super::super::utils::signals::linux::Interrupt;
+use super::super::super::utils::signals::linux::Interrupt;
 
 /// Virtio block device implementation using MMIO transport.
 /// Handles guest memory, disk image backing, virtio queue, and interrupts.
