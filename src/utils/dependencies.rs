@@ -1,4 +1,5 @@
 use std::process::Command;
+use std::fs::read_dir;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum PackageManager {
@@ -79,7 +80,7 @@ pub fn download_guestmount_if_not_present() -> Result<(), String> {
             );
         }
     };
-    
+
     if let PackageManager::APT = package_manager {
         let status = Command::new("sh")
             .arg("-c")
@@ -100,4 +101,27 @@ pub fn download_guestmount_if_not_present() -> Result<(), String> {
             Err(e) => Err(format!("Failed to run {}: {}", cmd, e)),
         }
     }
+}
+
+pub fn find_linux_distribution_image() -> Option<String> {
+    let entries = match read_dir(".") {
+        Ok(entries) => entries,
+        Err(_) => return None,
+    };
+
+    for entry in entries {
+        let entry = match entry {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+        let file_name = entry.file_name().to_string_lossy().into_owned();
+        if file_name.ends_with(".qcow2") || file_name.ends_with(".img") 
+        || file_name.ends_with(".iso") {
+            match entry.path().to_str() {
+                Some(path) => return Some(path.to_string()),
+                None => continue,
+            }
+        }
+    }
+    None
 }

@@ -1,6 +1,14 @@
 use AsgardManager::utils::dependencies::{check_if_guestmount_is_installed,
-    PackageManager};
+    PackageManager, find_linux_distribution_image};
 use std::process::Command;
+use std::fs::File;
+use std::env;
+use std::path::Path;
+use tempfile::tempdir;
+use std::sync::Mutex;
+
+// Prevent tests from colliding
+static FIND_LINUX_DISTRIBUTION_IMAGE_TEST_LOCK: Mutex<()> = Mutex::new(());
 
 fn command_exists(cmd: &str) -> bool {
     Command::new("which")
@@ -57,5 +65,80 @@ fn test_guestmount_installed_or_not() {
     );
 }
 
-// Optionally, you can mock Command to test both branches, but that requires more setup
-// and is not shown here for simplicity.
+#[test]
+fn test_find_linux_distribution_image_qcow2() {
+    let _guard = FIND_LINUX_DISTRIBUTION_IMAGE_TEST_LOCK.lock().unwrap();
+    let temp = tempdir().unwrap();
+    let old_dir = env::current_dir().unwrap();
+    env::set_current_dir(temp.path()).unwrap();
+
+    let test_file = "test_image.qcow2";
+    File::create(test_file).unwrap();
+    let result = find_linux_distribution_image();
+    assert!(result.is_some());
+    let found = result.unwrap();
+    assert_eq!(
+        Path::new(&found).file_name().unwrap(),
+        test_file
+    );
+
+    env::set_current_dir(old_dir).unwrap();
+}
+
+#[test]
+fn test_find_linux_distribution_image_img() {
+    let _guard = FIND_LINUX_DISTRIBUTION_IMAGE_TEST_LOCK.lock().unwrap();
+    let temp = tempdir().unwrap();
+    let old_dir = env::current_dir().unwrap();
+    env::set_current_dir(temp.path()).unwrap();
+
+    let test_file = "test_image.img";
+    File::create(test_file).unwrap();
+    let result = find_linux_distribution_image();
+    assert!(result.is_some());
+    let found = result.unwrap();
+    assert_eq!(
+        Path::new(&found).file_name().unwrap(),
+        test_file
+    );
+
+    env::set_current_dir(old_dir).unwrap();
+}
+
+#[test]
+fn test_find_linux_distribution_image_iso() {
+    let _guard = FIND_LINUX_DISTRIBUTION_IMAGE_TEST_LOCK.lock().unwrap();
+    let temp = tempdir().unwrap();
+    let old_dir = env::current_dir().unwrap();
+    env::set_current_dir(temp.path()).unwrap();
+
+    let test_file = "test_image.iso";
+    File::create(test_file).unwrap();
+    let result = find_linux_distribution_image();
+    assert!(result.is_some());
+    let found = result.unwrap();
+    assert_eq!(
+        Path::new(&found).file_name().unwrap(),
+        test_file
+    );
+
+    env::set_current_dir(old_dir).unwrap();
+}
+
+#[test]
+fn test_find_linux_distribution_image_none() {
+    let _guard = FIND_LINUX_DISTRIBUTION_IMAGE_TEST_LOCK.lock().unwrap();
+    let temp = tempdir().unwrap();
+    let old_dir = env::current_dir().unwrap();
+    env::set_current_dir(temp.path()).unwrap();
+
+    // Debug: print files in the directory
+    for entry in std::fs::read_dir(".").unwrap() {
+        println!("File in temp dir: {:?}", entry.unwrap().file_name());
+    }
+
+    let result = find_linux_distribution_image();
+    assert!(result.is_none(), "Should return None if no image files are present");
+
+    env::set_current_dir(old_dir).unwrap();
+}

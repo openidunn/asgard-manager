@@ -7,8 +7,6 @@ const ZERO_MB: u32 = 0;
 const ZERO_CORES: u32 = 0;
 const ONE_CORE: u32 = 1;
 
-static VM_TEST_LOCK: Mutex<()> = Mutex::new(());
-
 #[test]
 fn test_vmsetup_new_with_valid_values() {
     let setup = VmSetup::new(TEST_MB, TEST_CPU_CORES);
